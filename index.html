@@ -2,9 +2,6 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<!-- Все пути в документе считаются от корня сайта: страница тайтла
-     открывается по адресу /watch/<id>, и относительный style.css иначе
-     искался бы в /watch/. Сайт живёт в корне домена (doramlist.github.io). -->
 <base href="/">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12171d">
@@ -14,8 +11,6 @@
 <meta name="keywords" content="дорамы, смотреть дорамы онлайн, корейские сериалы, китайские дорамы, японские дорамы, тайландские дорамы, DoramList">
 <meta name="author" content="DoramList">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
-<!-- Боевой адрес. Он же в Open Graph, микроразметке, robots.txt
-     и sitemap.xml — при смене домена правится во всех четырёх местах. -->
 <link rel="canonical" href="https://doramlist.github.io/">
 
 <!-- Open Graph -->
@@ -98,7 +93,7 @@ if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
 <div class="blocked" id="blocked">
   <div class="blocked__box">
     <h1>Сайт доступен только на doramlist.github.io</h1>
-    <p>Эта копия работает на <b>doramlist.github.io</b> и <b>vkader.ucoz.net</b>. Откройте один из этих адресов.</p>
+    <p>Эта копия работает на <b>doramlist.github.io</b>. Откройте один из этих адресов.</p>
   </div>
 </div>
 
@@ -221,6 +216,6 @@ alt=""/></a><script>(function(d,s){d.getElementById("licntDE02").src=
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="https://vkader.ucoz.net/dpoisk/app.js"></script>
+<script src="https://vkader.ucoz.net/dpoisk/app.locked.js"></script>
 </body>
 </html>
