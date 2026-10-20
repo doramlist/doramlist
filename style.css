@@ -1,0 +1,709 @@
+/* =========================================================
+   DoramList — статическое приложение (поиск + страница деталей)
+   Дизайн повторяет референс reyoho.ru (тёмная тема)
+   ========================================================= */
+
+:root{
+  --bg:#12171d;
+  --bg-soft:#171d24;
+  --panel:#1a2129;
+  --panel-2:#222a34;
+  --panel-3:#2a333f;
+  --line:rgba(255,255,255,.075);
+  --line-strong:rgba(255,255,255,.14);
+  --text:#e9eff6;
+  --text-2:#b9c4d0;
+  --muted:#8b98a8;
+  --blue:#2f80ed;
+  --blue-2:#1f6bd6;
+  --gold:#f5b544;
+  --red:#e5484d;
+  --radius:14px;
+  --radius-sm:10px;
+  --shadow:0 14px 34px rgba(0,0,0,.42);
+  --maxw:1060px;
+  --font:'Inter','Google Sans Flex',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --font-display:'Oswald','Inter',system-ui,sans-serif;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+
+html{-webkit-text-size-adjust:100%}
+
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+[hidden]{display:none!important}
+
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:6px}
+
+/* ---------------- экран загрузки ---------------- */
+/* Три кольца-орбиты: каждое — окружность с подкрашенным краем, повёрнутая
+   в 3D и вращающаяся вокруг своей оси. Вместе читаются как один тонкий
+   белый «узел», как на экране загрузки Tunime (an0ncer.github.io). */
+.boot{
+  position:fixed;inset:0;z-index:9999;
+  display:grid;place-items:center;
+  background:var(--bg);
+  opacity:1;
+  transition:opacity .35s ease;
+}
+.boot.is-off{opacity:0;pointer-events:none}
+.boot__orbit{position:relative;width:64px;height:64px;border-radius:50%;perspective:800px}
+.boot__ring{position:absolute;inset:0;box-sizing:border-box;border-radius:50%}
+.boot__ring.one{animation:boot-one 1s linear infinite;border-bottom:3px solid #efeffa}
+.boot__ring.two{animation:boot-two 1s linear infinite;border-right:3px solid #efeffa}
+.boot__ring.three{animation:boot-three 1s linear infinite;border-top:3px solid #efeffa}
+@keyframes boot-one{
+  0%{transform:rotateX(35deg) rotateY(-45deg) rotateZ(0)}
+  100%{transform:rotateX(35deg) rotateY(-45deg) rotateZ(360deg)}
+}
+@keyframes boot-two{
+  0%{transform:rotateX(50deg) rotateY(10deg) rotateZ(0)}
+  100%{transform:rotateX(50deg) rotateY(10deg) rotateZ(360deg)}
+}
+@keyframes boot-three{
+  0%{transform:rotateX(35deg) rotateY(55deg) rotateZ(0)}
+  100%{transform:rotateX(35deg) rotateY(55deg) rotateZ(360deg)}
+}
+/* на настоящей 404 заставка не нужна: там app.js вообще не грузится */
+html.is-404 .boot{display:none}
+
+/* Загрузка тайтла: то же кольцо, но внутри страницы — шапка и поиск
+   остаются на месте, а вместо пустого экрана с часиками крутится
+   знакомый лоадер. Высота — «до подвала»: страница не прыгает и не
+   обрастает лишней прокруткой, пока данных нет. */
+.detail-load{
+  display:grid;place-items:center;
+  min-height:calc(100vh - 420px);
+  padding:24px 0;
+}
+.detail-load .boot__orbit{width:72px;height:72px}
+
+/* ---------------- чужой домен ---------------- */
+/* Сайт работает на своих доменах; на чужом вместо приложения —
+   короткая заглушка. Разметка .blocked лежит в HTML, а класс
+   is-blocked ставит проверка домена (app.js и служебный скрипт
+   в 404.html). */
+.blocked{display:none}
+html.is-blocked{overflow:hidden}
+html.is-blocked .shell,
+html.is-blocked .boot,
+html.is-blocked .backdrop,
+html.is-blocked .toast,
+html.is-blocked #nf{display:none!important}
+html.is-blocked .blocked{
+  display:grid;place-items:center;
+  min-height:100vh;padding:24px;text-align:center;
+}
+.blocked__box{max-width:520px;margin:0 auto}
+.blocked__box h1{
+  font:600 24px/1.3 var(--font-display);
+  margin:0 0 12px;color:var(--text);
+}
+.blocked__box p{margin:0;font-size:15px;line-height:1.6;color:var(--muted)}
+.blocked__box b{color:var(--text-2)}
+/* пока заставка на экране, страница под ней не прокручивается
+   (на 404 заставки нет, но её разметка остаётся в документе) */
+html:not(.is-404):has(.boot){overflow:hidden}
+/* меньше движения — одно кольцо без вращения, но экран тот же */
+@media (prefers-reduced-motion:reduce){
+  .boot__ring{animation:none}
+  .boot__ring.two,.boot__ring.three{display:none}
+}
+
+/* ---------------- фон (детальная страница) ---------------- */
+.backdrop{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:var(--bg)}
+.backdrop__img{
+  position:absolute;inset:-40px -40px auto -40px;
+  height:min(78vh,760px);
+  background-position:center 18%;
+  background-size:cover;
+  background-repeat:no-repeat;
+  opacity:0;
+  transition:opacity .5s ease;
+  filter:saturate(1.05);
+  /* Скрим снизу — только вуаль цвета фона, и к обрезу её плотность ~0.85,
+     а не 1: остаток картинки (≈15%) читался как линия обреза. Маска гасит
+     саму картинку до нуля ровно к краю — обрез исчезает на любом экране.
+     Проценты, а не пиксели: на низких экранах кромка не съедает картинку. */
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 80%,rgba(0,0,0,0) 100%);
+  mask-image:linear-gradient(180deg,#000 0,#000 80%,rgba(0,0,0,0) 100%);
+}
+.backdrop__img.is-on{opacity:1}
+.backdrop__scrim{
+  position:absolute;inset:0;
+  background:
+    linear-gradient(180deg,rgba(18,23,29,.55) 0%,rgba(18,23,29,.2) 26%,rgba(18,23,29,.86) 74%,var(--bg) 100%),
+    linear-gradient(90deg,var(--bg) 0%,rgba(18,23,29,.92) 30%,rgba(18,23,29,.55) 62%,rgba(18,23,29,.78) 100%);
+}
+
+/* ---------------- каркас ---------------- */
+.shell{
+  position:relative;
+  z-index:1;
+  width:100%;
+  max-width:var(--maxw);
+  margin:0 auto;
+  padding:0 20px 56px;
+}
+
+/* ---------------- шапка / бренд ---------------- */
+.brand{padding:34px 0 22px;text-align:center}
+.brand__mark{
+  display:inline-block;
+  font-family:var(--font-display);
+  font-weight:700;
+  font-size:clamp(40px,8vw,64px);
+  letter-spacing:.06em;
+  line-height:1;
+  color:#fff;
+  text-shadow:0 8px 30px rgba(47,128,237,.35);
+  transition:transform .2s ease,opacity .2s ease;
+}
+.brand__mark:hover{transform:translateY(-2px)}
+.brand__sub{
+  margin:10px 0 0;
+  font-size:12px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+/* логотип тайтла в шапке — вместо «DoramList» и подзаголовка (страница деталей) */
+.brand__logo{
+  display:block;
+  margin:0 auto;
+  max-width:min(100%,640px);
+  max-height:136px;
+  width:auto;height:auto;
+  object-fit:contain;
+  filter:drop-shadow(0 14px 36px rgba(0,0,0,.55));
+}
+/* надстройки остаются в разметке (ссылка на главную, SEO, скринридеры),
+   но из потока выводятся */
+.brand.has-logo .brand__mark,
+.brand.has-logo .brand__sub{
+  position:absolute;width:1px;height:1px;
+  overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);
+  white-space:nowrap;margin:-1px;padding:0;border:0;
+}
+
+/* ---------------- верхняя строка ---------------- */
+.topbar{display:flex;gap:10px;align-items:center;margin-bottom:22px}
+.search{flex:1;min-width:0;display:flex}
+.search__field{
+  flex:1;min-width:0;display:flex;align-items:center;gap:8px;
+  height:52px;padding:0 8px 0 14px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  transition:border-color .18s ease,background .18s ease;
+}
+.search__field:focus-within{border-color:rgba(47,128,237,.6);background:#1d2530}
+.search__icon{color:var(--muted);flex:none}
+.search__input{
+  flex:1;min-width:0;height:100%;border:0;background:none;outline:none;
+  font-size:15px;
+}
+.search__input::placeholder{color:var(--muted)}
+.search__btn{
+  flex:none;width:38px;height:38px;display:grid;place-items:center;
+  border-radius:10px;color:var(--muted);
+  transition:background .15s ease,color .15s ease,transform .15s ease;
+}
+.search__btn:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.search__btn:active{transform:scale(.94)}
+.search__btn.is-on{color:#fff;background:var(--blue)}
+
+/* ---------------- кнопки ---------------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:52px;padding:0 18px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);font-size:14px;font-weight:600;
+  transition:background .16s ease,border-color .16s ease,transform .12s ease;
+}
+.btn:hover{background:var(--panel-2);border-color:var(--line-strong)}
+.btn:active{transform:translateY(1px)}
+.btn--back{flex:none}
+.btn--home{flex:none;color:var(--text-2)}
+.btn--home:hover{color:#fff}
+.btn--primary{background:var(--blue);border-color:transparent;color:#fff;height:42px}
+.btn--primary:hover{background:var(--blue-2)}
+.btn--ghost{height:42px;background:var(--panel-2)}
+.btn--block{width:100%}
+.btn--more{height:46px;padding:0 28px;background:var(--panel-2);border-radius:12px}
+.btn--star{
+  height:46px;width:100%;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+}
+.link-btn{
+  color:var(--muted);font-size:13px;border-bottom:1px dashed currentColor;padding-bottom:1px;
+}
+.link-btn:hover{color:var(--text)}
+
+.view[hidden]{display:none}
+
+.results-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:2px 0 14px;font-size:14px;color:var(--muted);
+}
+
+/* История просмотров на пустой главной: тот же грид, что у выдачи,
+   только заголовок без счётчика и кнопка очистки справа */
+.history[hidden]{display:none}
+.history .results-head{margin:0 0 12px}
+.link-btn.is-armed{color:var(--red);border-bottom-style:solid}
+@keyframes fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* ---------------- сетка карточек ---------------- */
+.grid{
+  display:grid;
+  gap:10px;
+  grid-template-columns:repeat(auto-fill,minmax(145px,1fr));
+}
+@media(min-width:640px){.grid{gap:12px;grid-template-columns:repeat(auto-fill,minmax(165px,1fr))}}
+@media(min-width:960px){.grid{grid-template-columns:repeat(auto-fill,minmax(185px,1fr))}}
+
+.card{
+  position:relative;display:block;
+  border-radius:12px;overflow:hidden;
+  background:var(--panel);
+  aspect-ratio:2/3;
+  isolation:isolate;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+  transition:transform .22s cubic-bezier(.2,.7,.3,1),box-shadow .22s ease;
+}
+.card:hover{transform:translateY(-5px);box-shadow:0 18px 34px rgba(0,0,0,.5)}
+.card__img{
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;background:#1b232c;
+  transition:transform .35s ease,opacity .3s ease;
+}
+.card:hover .card__img{transform:scale(1.05)}
+.card__scrim{
+  position:absolute;inset:auto 0 0 0;height:62%;
+  background:linear-gradient(180deg,rgba(9,12,16,0) 0%,rgba(9,12,16,.72) 52%,rgba(9,12,16,.94) 100%);
+  pointer-events:none;
+}
+.card__ratings{
+  position:absolute;top:7px;right:7px;z-index:2;
+  display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;
+  max-width:68%;
+}
+
+/* Плитка истории: крестик стоит рядом с карточкой, а не внутри ссылки,
+   поэтому клик по нему не считается переходом на тайтл */
+.card-wrap{position:relative}
+
+/* «Убрать из истории» — слева сверху: справа уже бейджи рейтингов */
+.card__remove{
+  position:absolute;top:7px;left:7px;z-index:3;
+  display:grid;place-items:center;
+  width:26px;height:26px;padding:0 0 2px;
+  border-radius:50%;
+  background:rgba(6,9,13,.72);
+  border:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(6px);
+  color:#dfe8f2;font-size:16px;line-height:1;
+  transition:background .16s ease,border-color .16s ease,color .16s ease;
+}
+.card__remove:hover{background:rgba(229,72,77,.92);border-color:transparent;color:#fff}
+.card__remove:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(47,128,237,.45)}
+.rate{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 6px 3px 5px;
+  background:rgba(6,9,13,.72);
+  backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:7px;
+  font-size:11px;line-height:1.1;
+}
+.rate i{
+  font-style:normal;font-weight:700;font-size:9.5px;letter-spacing:.04em;
+  color:#9fb0c3;
+}
+.rate b{font-weight:700;color:#fff}
+.rate--mdl{border-color:rgba(62,203,230,.5)}
+.rate--mdl i{color:#6fd4ef}
+/* SK — фиолетовый, чтобы четыре бейджа в шапке карточки читались раздельно */
+.rate--sk{border-color:rgba(150,120,255,.45)}
+.rate--sk i{color:#a58cff}
+.card__meta{position:absolute;left:10px;right:10px;bottom:9px;z-index:2}
+.card__title{
+  font-size:14px;font-weight:600;line-height:1.25;color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,.65);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.card__sub{display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;row-gap:4px}
+.tag{
+  padding:2px 6px;border-radius:5px;
+  background:var(--blue);
+  font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#fff;
+}
+.tag--serial{background:var(--blue)}
+.tag--movie{background:#3aa76d}
+.card__year{font-size:12.5px;color:#c8d2de}
+.card__country{
+  font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+}
+
+/* скелетоны */
+.grid--skeleton{margin-top:0}
+.grid--skeleton:empty{display:none}
+.skel{
+  border-radius:12px;aspect-ratio:2/3;
+  background:linear-gradient(100deg,#1a212a 30%,#222b36 48%,#1a212a 66%);
+  background-size:300% 100%;
+  animation:shimmer 1.25s linear infinite;
+}
+@keyframes shimmer{from{background-position:150% 0}to{background-position:-50% 0}}
+
+.empty{
+  text-align:center;padding:56px 16px;
+  background:var(--panel);border:1px solid var(--line);border-radius:18px;
+}
+.empty__icon{font-size:38px}
+.empty__title{margin:12px 0 4px;font-size:19px;font-weight:700}
+.empty__text{margin:0;color:var(--muted);font-size:14px}
+
+.loadmore{display:flex;justify-content:center;margin-top:24px}
+
+/* =========================================================
+   СТРАНИЦА ДЕТАЛЕЙ
+   ========================================================= */
+.detail{animation:fade .3s ease}
+
+/* --- герой --- */
+.hero{
+  display:grid;
+  grid-template-columns:200px minmax(0,1fr) 270px;
+  gap:26px;
+  align-items:start;
+  padding:6px 0 34px;
+}
+.hero__poster{
+  position:relative;border-radius:14px;overflow:hidden;
+  aspect-ratio:2/3;background:#1b232c;
+  box-shadow:var(--shadow);
+}
+.hero__poster img{width:100%;height:100%;object-fit:cover}
+.hero__poster::after{
+  content:"";position:absolute;inset:0;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);
+  border-radius:14px;pointer-events:none;
+}
+
+.hero__media{min-width:0}
+#shareBtn{margin-top:12px}
+/* «Смотреть» — кнопка нужна только на телефоне, где плеер далеко внизу */
+.hero__watch{display:none}
+
+.hero__title{
+  margin:0;
+  font-size:clamp(26px,4.6vw,35px);
+  font-weight:700;letter-spacing:-.015em;line-height:1.15;
+  text-shadow:0 4px 24px rgba(0,0,0,.5);
+}
+.hero__badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 14px;align-items:center}
+.badge{
+  padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;
+  background:rgba(255,255,255,.09);border:1px solid var(--line-strong);color:var(--text-2);
+}
+.badge--age{background:rgba(255,255,255,.92);color:#12171d;border-color:transparent}
+.badge--quality{background:rgba(47,128,237,.18);border-color:rgba(47,128,237,.45);color:#bcd8ff}
+.hero__lead{
+  margin:0 0 6px;
+  font-size:15.5px;line-height:1.65;color:var(--text-2);
+  max-width:66ch;
+}
+.hero__hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+
+/* рейтинги справа — по мотивам референса (шапка-логотип + счёт + голоса) */
+.rating-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-start}
+.rating{
+  display:flex;align-items:center;justify-content:center;
+  height:37px;border-radius:5px;overflow:hidden;
+  background:rgba(0,0,0,.55);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  text-decoration:none;color:inherit;
+  transition:transform .18s ease, background .18s ease;
+}
+a.rating:hover{background:rgba(0,0,0,.72);transform:translateY(-2px)}
+.rating--none{
+  padding:0 12px;font-size:12.5px;color:var(--muted);
+  background:rgba(0,0,0,.4);height:34px;
+}
+.rating__logo{
+  display:grid;place-items:center;align-self:stretch;
+  width:32px;padding:0 7px;flex:0 0 auto;
+}
+.rating--kp .rating__logo{background:#ff5500}
+.rating--im .rating__logo{background:#f5c518}
+.rating--mdl .rating__logo{background:#1675b6;width:auto;min-width:32px;padding:0 9px}
+.rating--sk .rating__logo{background:#6d5bd0;width:auto;min-width:32px;padding:0 9px}
+.rating__word{font-size:11px;font-weight:800;letter-spacing:.04em;color:#fff}
+.rating__body{
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+  padding:0 10px;height:37px;
+}
+.rating__val{font-size:15.7px;font-weight:700;line-height:15.7px;color:#fff}
+.rating__votes{font-size:8.5px;font-weight:500;line-height:8.5px;color:rgba(255,255,255,.62)}
+
+.sec-title{
+  margin:26px 0 12px;
+  font-size:19px;font-weight:700;letter-spacing:-.01em;
+}
+.sec-title--tight{margin-top:18px}
+
+/* таблица «О фильме» */
+.facts{margin:0;display:grid;grid-template-columns:auto 1fr;gap:9px 18px}
+.facts dt{font-size:13.5px;color:var(--muted);white-space:nowrap}
+.facts dd{margin:0;font-size:13.5px;color:var(--text);font-weight:500;word-break:break-word}
+.facts dd a{color:var(--blue)}
+
+/* актёры */
+.cast{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.cast li{font-size:14px;color:var(--text-2)}
+.cast__hint{margin:-4px 0 10px;font-size:11.5px;line-height:1.45;color:var(--muted)}
+.cast__link{
+  background:none;border:0;padding:0;margin:0;
+  font:inherit;color:inherit;text-align:left;cursor:pointer;
+  border-radius:4px;transition:color .15s ease;
+}
+.cast__link:hover{color:var(--blue);text-decoration:underline;text-underline-offset:3px}
+.cast__link:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.cast__more{margin-top:12px;font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+
+/* --- плеер --- */
+.player{margin:4px 0 8px}
+.player__tabs{display:flex;gap:6px;margin:0 0 10px}
+.ptab{
+  appearance:none;cursor:pointer;font:inherit;
+  display:inline-flex;align-items:center;height:32px;padding:0 15px;
+  border-radius:9px;background:var(--panel-2);color:var(--text-2);
+  border:1px solid var(--line-strong);font-size:13.5px;font-weight:600;
+  transition:background .16s ease,color .16s ease,border-color .16s ease;
+}
+.ptab:hover{color:var(--text);border-color:rgba(47,128,237,.5)}
+.ptab.is-on{background:rgba(47,128,237,.18);border-color:rgba(47,128,237,.6);color:#cfe3ff}
+.ptab:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+.player__frame{
+  position:relative;aspect-ratio:16/9;width:100%;
+  background:#000;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.player__frame iframe,
+.player__frame video{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+
+/* --- DList: кнопки поверх картинки (качество, скорость) --- */
+.dlist__bar{position:absolute;top:10px;right:10px;z-index:4;display:flex;gap:6px}
+.dlist__bar[hidden]{display:none}
+.dlist__btn{
+  appearance:none;display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;
+  border-radius:8px;cursor:pointer;background:rgba(12,16,21,.78);
+  border:1px solid rgba(255,255,255,.18);color:#e9eff6;
+  font:inherit;font-size:12px;font-weight:700;backdrop-filter:blur(6px);
+  transition:background .15s,border-color .15s;
+}
+.dlist__btn:hover{background:rgba(34,42,52,.92);border-color:rgba(255,255,255,.3)}
+.dlist__btn.is-off{opacity:.55;cursor:default}
+.dlist__btn svg{flex:none}
+.dlist__menu{
+  position:absolute;top:48px;right:10px;z-index:5;display:grid;gap:2px;min-width:104px;padding:6px;
+  background:rgba(18,23,29,.96);border:1px solid var(--line-strong);
+  border-radius:10px;box-shadow:var(--shadow);
+}
+.dlist__menu[hidden]{display:none}
+.dlist__menu button{
+  appearance:none;text-align:left;cursor:pointer;background:none;border:0;border-radius:7px;
+  color:var(--text-2);font:inherit;font-size:13px;font-weight:600;padding:7px 10px;
+}
+.dlist__menu button:hover{background:var(--panel-2);color:var(--text)}
+.dlist__menu button.is-on{background:rgba(47,128,237,.2);color:#cfe3ff}
+
+/* ряд выбора — только у своего плеера. Панели свои, а не <select>: счётчик
+   пункта прижат вправо и не сливается с названием студии/сезона. */
+.player__controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.player__controls[hidden]{display:none}
+
+.pdsel{position:relative;display:flex;flex-direction:column;gap:5px;flex:1 1 165px;min-width:0}
+.pdsel__cap{font-size:11.5px;color:var(--muted);letter-spacing:.02em}
+.pdsel__btn{
+  appearance:none;cursor:pointer;font:inherit;font-size:13.5px;text-align:left;
+  display:flex;align-items:center;gap:9px;width:100%;
+  background:var(--panel-2);color:var(--text);
+  border:1px solid var(--line-strong);border-radius:9px;
+  padding:9px 11px;transition:border-color .16s ease;
+}
+.pdsel__btn:hover{border-color:rgba(47,128,237,.5)}
+.pdsel__btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.pdsel.is-open .pdsel__btn{border-color:rgba(47,128,237,.6)}
+.pdsel__val{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdsel__note{flex:0 0 auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.pdsel__arrow{
+  flex:0 0 auto;width:6px;height:6px;
+  border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+  transform:translateY(-2px) rotate(45deg);transition:transform .16s ease;
+}
+.pdsel.is-open .pdsel__arrow{transform:translateY(1px) rotate(-135deg)}
+
+.pdsel__panel{
+  position:absolute;z-index:30;top:calc(100% + 6px);left:0;right:0;
+  max-height:268px;overflow:auto;padding:5px;display:none;
+  background:var(--panel);border:1px solid var(--line-strong);border-radius:10px;
+  box-shadow:0 18px 40px rgba(0,0,0,.55);
+}
+.pdsel.is-open .pdsel__panel{display:block}
+.pdsel__item{
+  appearance:none;cursor:pointer;font:inherit;font-size:13.5px;text-align:left;
+  display:flex;align-items:center;gap:12px;width:100%;
+  background:none;border:0;border-radius:7px;color:var(--text-2);
+  padding:8px 9px;
+}
+.pdsel__item:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.pdsel__item.is-on{background:rgba(47,128,237,.18);color:#cfe3ff;font-weight:600}
+.pdsel__item:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.pdsel__item-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdsel__item-n{flex:0 0 auto;font-size:12px;color:var(--muted);font-weight:400;white-space:nowrap}
+.player__placeholder{
+  position:absolute;inset:0;display:grid;place-items:center;gap:10px;
+  text-align:center;color:var(--muted);font-size:14px;padding:20px;
+  background:radial-gradient(120% 120% at 50% 0%,#1e2732 0%,#0d1116 75%);
+}
+.player__placeholder b{display:block;font-size:16px;color:var(--text);margin-bottom:4px}
+.player__hint{
+  display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;
+  margin:12px 2px 0;font-size:12.5px;color:var(--muted);text-align:center;
+}
+
+/* --- сколько серий вышло --- */
+.season-bar{
+  display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
+  background:linear-gradient(180deg,rgba(31,40,52,.75),rgba(20,26,33,.75));
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:15px 16px;margin-top:14px;
+}
+.season-bar[hidden]{display:none}
+.season-bar__main{flex:1;min-width:220px}
+.season-bar__title{
+  font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+}
+.season-bar__season{
+  font-size:12px;font-weight:700;color:#cfe3ff;
+  background:rgba(47,128,237,.16);border:1px solid rgba(47,128,237,.45);
+  border-radius:7px;padding:2px 8px;
+}
+.progress{
+  height:5px;border-radius:5px;background:rgba(255,255,255,.09);
+  margin:11px 0 9px;overflow:hidden;
+}
+.progress span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),#4ea8ff);border-radius:5px}
+.season-bar__sub{font-size:13px;color:var(--muted)}
+.season-bar__meta{display:grid;gap:5px;font-size:13px;color:var(--muted);text-align:right}
+.season-bar__meta b{color:var(--text);font-size:14.5px;font-weight:700}
+
+/* подвал */
+.foot{
+  margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  font-size:12.5px;color:var(--muted);
+}
+.foot b{color:var(--text-2);font-weight:600}
+
+/* тост */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);
+  z-index:50;padding:12px 18px;border-radius:12px;
+  background:#222b36;border:1px solid var(--line-strong);
+  box-shadow:var(--shadow);font-size:14px;
+  opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+  max-width:min(92vw,520px);text-align:center;
+}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+/* =========================================================
+   АДАПТИВНОСТЬ
+   ========================================================= */
+@media(max-width:960px){
+  .hero{grid-template-columns:170px minmax(0,1fr);gap:20px}
+  .hero__aside{grid-column:1/-1}
+  .rating-row{justify-content:flex-start}
+}
+@media(max-width:640px){
+  .shell{padding:0 14px 44px}
+  .brand{padding:26px 0 18px}
+  .brand__sub{font-size:10.5px;letter-spacing:.12em}
+  .search__field{height:48px;padding-left:12px}
+  .btn{height:48px;padding:0 14px}
+  .btn--back span{display:none}
+  .btn--back{padding:0 14px}
+  .brand__logo{max-height:86px}
+  /* --- страница тайтла на телефоне: одна широкая колонка, как в кинотеатрах:
+     название → метки → рейтинги → «Смотреть» → описание → постер и актёры → факты --- */
+  .hero{
+    display:grid;
+    grid-template-columns:124px minmax(0,1fr);
+    column-gap:14px;row-gap:12px;
+    padding:0 0 22px;
+  }
+  .hero__main,.hero__aside{display:contents}   /* дети становятся ячейками сетки */
+  .hero__main > *,.hero__aside > *{min-width:0}
+
+  .hero__title{font-size:22px;order:1;grid-column:1/-1}
+  .hero__badges{order:2;grid-column:1/-1;margin:8px 0 0;gap:6px}
+  .hero__badges .badge{font-size:11px;padding:3px 8px}
+  .rating-row{order:3;grid-column:1/-1;justify-content:flex-start}
+  .hero__watch{
+    order:4;grid-column:1/-1;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;margin:2px 0 0;font-size:15px;font-weight:600;
+  }
+  .hero__lead{order:5;grid-column:1/-1;margin:0;font-size:14.5px;line-height:1.6}
+
+  .hero__media{order:6}
+  .hero__media .btn{height:38px;padding:0 8px;font-size:12.5px}
+  .cast-box{order:6}
+  .cast-box .sec-title{margin:0 0 6px;font-size:15px}
+  .cast-box .cast__hint{margin:0 0 8px;font-size:11px}
+  .cast-box .cast{grid-template-columns:minmax(0,1fr);row-gap:6px}
+  .cast-box .cast li{font-size:12.5px}
+  .cast-box .cast__more{margin-top:8px;font-size:12px}
+
+  .hero__main > .sec-title{order:7;grid-column:1/-1;margin:6px 0 10px;font-size:17px}
+  .facts{order:8;grid-column:1/-1;grid-template-columns:112px minmax(0,1fr);gap:8px 12px}
+  .facts dt,.facts dd{font-size:13px}
+
+  .season-bar{padding:13px;gap:10px}
+  .season-bar__meta{text-align:left}
+  .season-bar__title{font-size:14.5px}
+  .player__hint{font-size:12px;gap:7px}
+  .dlist__btn{height:28px;padding:0 8px;font-size:11.5px}
+
+  .foot{flex-direction:column;gap:6px}
+}
+@media(max-width:400px){
+  .grid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px}
+  .card__title{font-size:13px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}

@@ -1,0 +1,6 @@
+# DoramList — поиск дорам
+User-agent: *
+Allow: /
+Disallow: /make-icons.js
+
+Sitemap: https://doramlist.github.io/sitemap.xml

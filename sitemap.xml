@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Приложение собирает страницы в браузере: /watch/<id> — это тот же
+  документ, что и главная (на GitHub Pages путь отдаётся через 404.html),
+  поэтому отдельных индексируемых документов под тайтлы нет. Перечислять
+  в карте нечего, кроме самой главной.
+
+  404.html сюда сознательно не входит: страница помечена noindex,
+  а карта сайта и noindex противоречат друг другу.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <url>
+    <loc>https://doramlist.github.io/</loc>
+    <lastmod>2026-10-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+</urlset>

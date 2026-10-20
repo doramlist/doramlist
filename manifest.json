@@ -1,0 +1,45 @@
+{
+  "id": "./",
+  "name": "DoramList — дорамы онлайн",
+  "short_name": "DoramList",
+  "description": "Поиск дорам по названию: Китай, Корея, Япония, Таиланд, Тайвань, Гонконг и другие страны. Просмотр онлайн.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#12171d",
+  "theme_color": "#12171d",
+  "categories": ["entertainment", "video"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Поиск",
+      "short_name": "Поиск",
+      "description": "Найти дораму",
+      "url": "./index.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
